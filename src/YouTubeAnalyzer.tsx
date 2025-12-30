@@ -215,7 +215,6 @@ const YouTubeAnalyzer = () => {
         const likes = parseInt(video.statistics.likeCount || 0);
 
         const duration = parseDuration(video.contentDetails?.duration || '');
-        console.log(`Video ${video.id}: duration raw=${video.contentDetails?.duration}, parsed=${duration}`);
 
         const cpd = comments / daysAgo;
         const cpv = views > 0 ? comments / views : 0;
