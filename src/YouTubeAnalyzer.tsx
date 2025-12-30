@@ -13,6 +13,18 @@ const YouTubeAnalyzer = () => {
   const [progress, setProgress] = useState('');
   const [expandedVideo, setExpandedVideo] = useState(null);
   const [channelAverages, setChannelAverages] = useState(null);
+  const [minVideoLength, setMinVideoLength] = useState(2);
+  const [maxVideosToAnalyze, setMaxVideosToAnalyze] = useState(500);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
+  const parseDuration = (duration) => {
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    const hours = parseInt(match[1] || '0');
+    const minutes = parseInt(match[2] || '0');
+    const seconds = parseInt(match[3] || '0');
+    return hours * 3600 + minutes * 60 + seconds;
+  };
 
   const extractChannelId = (input) => {
     const cleanInput = input.trim();
@@ -138,7 +150,7 @@ const YouTubeAnalyzer = () => {
         if (!nextPageToken) break;
       }
 
-      allVideoIds = allVideoIds.slice(0, 500);
+      allVideoIds = allVideoIds.slice(0, maxVideosToAnalyze);
       setProgress(`Fetching details for ${allVideoIds.length} videos...`);
 
       const videoDetails = [];
@@ -146,7 +158,7 @@ const YouTubeAnalyzer = () => {
         const batch = allVideoIds.slice(i, i + 50);
         setProgress(`Fetching video details (${i + batch.length}/${allVideoIds.length})...`);
         
-        const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${batch.join(',')}&key=${apiKey}`;
+        const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${batch.join(',')}&key=${apiKey}`;
         
         const videoResponse = await fetch(videoUrl);
         const videoData = await videoResponse.json();
@@ -158,9 +170,20 @@ const YouTubeAnalyzer = () => {
         videoDetails.push(...videoData.items);
       }
 
+      // Filter videos based on minimum length and max count
+      const minLengthSeconds = minVideoLength * 60;
+      let filteredVideoDetails = videoDetails.filter(video => {
+        const duration = parseDuration(video.contentDetails?.duration || '');
+        return duration >= minLengthSeconds;
+      });
+
+      // Limit to max videos to analyze
+      filteredVideoDetails = filteredVideoDetails.slice(0, maxVideosToAnalyze);
+
+      setProgress(`Filtering videos (min ${minVideoLength}min length)...`);
       setProgress('Calculating analytics...');
       const now = new Date();
-      const processedVideos = videoDetails.map(video => {
+      const processedVideos = filteredVideoDetails.map(video => {
         const publishedAt = new Date(video.snippet.publishedAt);
         const daysAgo = Math.max(1, Math.floor((now - publishedAt) / (1000 * 60 * 60 * 24)));
         
@@ -378,6 +401,59 @@ const YouTubeAnalyzer = () => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 disabled={loading}
               />
+             </div>
+
+            <div className="mb-4">
+              <button
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                Advanced Options
+              </button>
+
+              {showAdvancedOptions && (
+                <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Minimum Video Length
+                    </label>
+                    <select
+                      value={minVideoLength}
+                      onChange={(e) => setMinVideoLength(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    >
+                      <option value={2}>2 minutes</option>
+                      <option value={5}>5 minutes</option>
+                      <option value={7}>7 minutes</option>
+                      <option value={9}>9 minutes</option>
+                      <option value={14}>14 minutes</option>
+                      <option value={19}>19 minutes</option>
+                      <option value={30}>30 minutes</option>
+                      <option value={60}>60 minutes</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Max Videos to Analyze (1-9999)
+                    </label>
+                    <input
+                      type="number"
+                      value={maxVideosToAnalyze}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (value >= 1 && value <= 9999) {
+                          setMaxVideosToAnalyze(value);
+                        }
+                      }}
+                      min={1}
+                      max={9999}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">
