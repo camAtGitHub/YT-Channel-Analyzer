@@ -354,6 +354,7 @@ const YouTubeAnalyzer = () => {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Enter your API key..."
+              autoComplete="current-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent mb-4"
             />
             
@@ -378,7 +379,7 @@ const YouTubeAnalyzer = () => {
 
             <div className="mt-6 text-xs text-gray-500">
               <p className="font-semibold mb-1">Privacy Note:</p>
-              <p>Your API key is stored only in your browser's memory for this session and is never sent to any server except Google's YouTube API.</p>
+              <p>Your API key is stored only in your browser's memory for this session and is never sent to any server except Google's YouTube API. Your browser may offer to save the key to your password manager.</p>
             </div>
           </div>
         </div>
