@@ -137,14 +137,22 @@ const YouTubeAnalyzer = () => {
       });
 
       const uploadsPlaylistId = channel.contentDetails.relatedPlaylists.uploads;
-      
+
+      if (maxVideosToAnalyze > 2000) {
+        const confirmed = window.confirm(`Fetching ${maxVideosToAnalyze} videos may take some time. Continue?`);
+        if (!confirmed) {
+          setLoading(false);
+          return;
+        }
+      }
+
       setProgress('Fetching video list...');
       let allVideoIds = [];
       let nextPageToken = null;
       let pageCount = 0;
-      const maxPages = 10;
+      const maxPages = Math.min(Math.ceil(maxVideosToAnalyze / 50), 200);
 
-      while (pageCount < maxPages && allVideoIds.length < 500) {
+      while (pageCount < maxPages && allVideoIds.length < maxVideosToAnalyze) {
         const playlistUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploadsPlaylistId}&maxResults=50&key=${apiKey}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`;
         
         const playlistResponse = await fetch(playlistUrl);
