@@ -230,6 +230,7 @@ const YouTubeAnalyzer = () => {
           comments,
           likes,
           duration,
+          formattedDuration: formatDuration(duration),
           cpd,
           cpv,
           lpv,
@@ -319,7 +320,7 @@ const YouTubeAnalyzer = () => {
       v.views,
       v.likes,
       v.comments,
-      formatDuration(v.duration),
+      v.formattedDuration,
       v.cpd.toFixed(4),
       v.cpv.toFixed(6),
       v.lpv.toFixed(6),
@@ -723,7 +724,7 @@ const YouTubeAnalyzer = () => {
 
                              <div className="flex items-center gap-2">
                                <Clock className="w-4 h-4 text-gray-400" />
-                               <span className="font-semibold">{formatDuration(video.duration)}</span>
+                               <span className="font-semibold">{video.formattedDuration}</span>
                                <span className="text-gray-600">duration</span>
                              </div>
                            </div>
