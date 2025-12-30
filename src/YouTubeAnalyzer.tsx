@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, TrendingUp, MessageSquare, Eye, ThumbsUp, Download, RefreshCw, Sparkles, AlertCircle, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { BarChart3, TrendingUp, MessageSquare, Eye, ThumbsUp, Download, RefreshCw, Sparkles, AlertCircle, ChevronDown, ChevronUp, Info, Clock } from 'lucide-react';
 
 const YouTubeAnalyzer = () => {
   const [apiKey, setApiKey] = useState('');
@@ -24,6 +24,17 @@ const YouTubeAnalyzer = () => {
     const minutes = parseInt(match[2] || '0');
     const seconds = parseInt(match[3] || '0');
     return hours * 3600 + minutes * 60 + seconds;
+  };
+
+  const formatDuration = (seconds) => {
+    if (seconds === 0) return 'N/A';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
   const extractChannelId = (input) => {
@@ -592,7 +603,7 @@ const YouTubeAnalyzer = () => {
                             {video.title}
                           </a>
                           
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-3">
                             <div className="flex items-center gap-2">
                               <Eye className="w-4 h-4 text-gray-400" />
                               <span className="font-semibold">{video.views.toLocaleString()}</span>
@@ -611,12 +622,18 @@ const YouTubeAnalyzer = () => {
                               <span className="text-gray-600">comments</span>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="w-4 h-4 text-gray-400" />
-                              <span className="font-semibold">{video.daysAgo}</span>
-                              <span className="text-gray-600">days ago</span>
-                            </div>
-                          </div>
+                             <div className="flex items-center gap-2">
+                               <TrendingUp className="w-4 h-4 text-gray-400" />
+                               <span className="font-semibold">{video.daysAgo}</span>
+                               <span className="text-gray-600">days ago</span>
+                             </div>
+
+                             <div className="flex items-center gap-2">
+                               <Clock className="w-4 h-4 text-gray-400" />
+                               <span className="font-semibold">{formatDuration(parseDuration(video.contentDetails?.duration || ''))}</span>
+                               <span className="text-gray-600">duration</span>
+                             </div>
+                           </div>
                           
                           <div className="flex flex-wrap gap-2 mb-3">
                             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
