@@ -209,16 +209,19 @@ const YouTubeAnalyzer = () => {
       const processedVideos = filteredVideoDetails.map(video => {
         const publishedAt = new Date(video.snippet.publishedAt);
         const daysAgo = Math.max(1, Math.floor((now - publishedAt) / (1000 * 60 * 60 * 24)));
-        
+
         const views = parseInt(video.statistics.viewCount || 0);
         const comments = parseInt(video.statistics.commentCount || 0);
         const likes = parseInt(video.statistics.likeCount || 0);
-        
+
+        const duration = parseDuration(video.contentDetails?.duration || '');
+        console.log(`Video ${video.id}: duration raw=${video.contentDetails?.duration}, parsed=${duration}`);
+
         const cpd = comments / daysAgo;
         const cpv = views > 0 ? comments / views : 0;
         const lpv = views > 0 ? likes / views : 0;
         const engagementRate = views > 0 ? (likes + comments) / views : 0;
-        
+
         return {
           id: video.id,
           title: video.snippet.title,
@@ -227,6 +230,7 @@ const YouTubeAnalyzer = () => {
           views,
           comments,
           likes,
+          duration,
           cpd,
           cpv,
           lpv,
@@ -310,12 +314,13 @@ const YouTubeAnalyzer = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Title', 'Views', 'Likes', 'Comments', 'CPD', 'CPV', 'LPV', 'Engagement Rate', 'Days Ago', 'Published', 'URL'];
+    const headers = ['Title', 'Views', 'Likes', 'Comments', 'Duration', 'CPD', 'CPV', 'LPV', 'Engagement Rate', 'Days Ago', 'Published', 'URL'];
     const rows = sortedVideos.map(v => [
       `"${v.title.replace(/"/g, '""')}"`,
       v.views,
       v.likes,
       v.comments,
+      formatDuration(v.duration),
       v.cpd.toFixed(4),
       v.cpv.toFixed(6),
       v.lpv.toFixed(6),
@@ -719,7 +724,7 @@ const YouTubeAnalyzer = () => {
 
                              <div className="flex items-center gap-2">
                                <Clock className="w-4 h-4 text-gray-400" />
-                               <span className="font-semibold">{formatDuration(parseDuration(video.contentDetails?.duration || ''))}</span>
+                               <span className="font-semibold">{formatDuration(video.duration)}</span>
                                <span className="text-gray-600">duration</span>
                              </div>
                            </div>
