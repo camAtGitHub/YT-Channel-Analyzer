@@ -288,6 +288,27 @@ const YouTubeAnalyzer = () => {
     return metrics[sortBy](b) - metrics[sortBy](a);
   });
 
+  const exportData = () => {
+    const data = {
+      videos,
+      channelInfo,
+      channelAverages,
+      fetchedCount,
+      filteredCount,
+      timestamp: Date.now(),
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const filename = `youtube-analysis-${channelInfo?.title || 'unknown'}-${dateStr}.json`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportToCSV = () => {
     const headers = ['Title', 'Views', 'Likes', 'Comments', 'CPD', 'CPV', 'LPV', 'Engagement Rate', 'Days Ago', 'Published', 'URL'];
     const rows = sortedVideos.map(v => [
@@ -321,6 +342,31 @@ const YouTubeAnalyzer = () => {
     setProgress('');
     setExpandedVideo(null);
     setChannelAverages(null);
+  };
+
+  const loadData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.videos && data.channelInfo && data.channelAverages) {
+          setVideos(data.videos);
+          setChannelInfo(data.channelInfo);
+          setChannelAverages(data.channelAverages);
+          setFetchedCount(data.fetchedCount || 0);
+          setFilteredCount(data.filteredCount || 0);
+          setHasApiKey(true);
+          setError('');
+        } else {
+          setError('Invalid data file. Please check the file format.');
+        }
+      } catch (err) {
+        setError('Failed to load data. The file may be corrupted.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const toggleVideoDetails = (videoId) => {
@@ -357,7 +403,7 @@ const YouTubeAnalyzer = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               YouTube Data API Key
             </label>
-            <input
+             <input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
@@ -365,7 +411,19 @@ const YouTubeAnalyzer = () => {
               autoComplete="current-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent mb-4"
             />
-            
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Or Load Saved Data
+              </label>
+              <input
+                type="file"
+                accept=".json"
+                onChange={loadData}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              />
+            </div>
+
             <button
               onClick={() => {
                 if (apiKey) {
@@ -597,13 +655,21 @@ const YouTubeAnalyzer = () => {
                     <option value="velocity">Velocity Score</option>
                   </select>
                   
-                  <button
-                    onClick={exportToCSV}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
-                  >
-                    <Download className="w-5 h-5" />
-                    Export CSV
-                  </button>
+                   <button
+                     onClick={exportData}
+                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                   >
+                     <Download className="w-5 h-5" />
+                     Save Data for Offline Viewing
+                   </button>
+
+                   <button
+                     onClick={exportToCSV}
+                     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+                   >
+                     <Download className="w-5 h-5" />
+                     Export CSV
+                   </button>
                 </div>
               </div>
 
