@@ -16,6 +16,8 @@ const YouTubeAnalyzer = () => {
   const [minVideoLength, setMinVideoLength] = useState(2);
   const [maxVideosToAnalyze, setMaxVideosToAnalyze] = useState(500);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [fetchedCount, setFetchedCount] = useState(0);
+  const [filteredCount, setFilteredCount] = useState(0);
 
   const parseDuration = (duration) => {
     const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -162,6 +164,7 @@ const YouTubeAnalyzer = () => {
       }
 
       allVideoIds = allVideoIds.slice(0, maxVideosToAnalyze);
+      setFetchedCount(allVideoIds.length);
       setProgress(`Fetching details for ${allVideoIds.length} videos...`);
 
       const videoDetails = [];
@@ -191,6 +194,7 @@ const YouTubeAnalyzer = () => {
       // Limit to max videos to analyze
       filteredVideoDetails = filteredVideoDetails.slice(0, maxVideosToAnalyze);
 
+      setFilteredCount(fetchedCount - filteredVideoDetails.length);
       setProgress(`Filtering videos (min ${minVideoLength}min length)...`);
       setProgress('Calculating analytics...');
       const now = new Date();
@@ -517,20 +521,30 @@ const YouTubeAnalyzer = () => {
         {channelInfo && channelAverages && (
           <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">{channelInfo.title}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{channelInfo.subscribers.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Subscribers</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{channelInfo.totalVideos.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Total Videos</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{videos.length.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">Analyzed</div>
-              </div>
-            </div>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+               <div className="text-center">
+                 <div className="text-2xl font-bold text-red-600">{channelInfo.subscribers.toLocaleString()}</div>
+                 <div className="text-sm text-gray-600">Subscribers</div>
+               </div>
+               <div className="text-center">
+                 <div className="text-2xl font-bold text-red-600">{channelInfo.totalVideos.toLocaleString()}</div>
+                 <div className="text-sm text-gray-600">Total Videos</div>
+               </div>
+               <div className="text-center">
+                 <div className="text-2xl font-bold text-red-600">{videos.length.toLocaleString()}</div>
+                 <div className="text-sm text-gray-600">Analyzed</div>
+               </div>
+               <div className="text-center">
+                 <div className="text-lg font-bold text-gray-700">{fetchedCount.toLocaleString()}</div>
+                 <div className="text-sm text-gray-600">Fetched</div>
+               </div>
+             </div>
+
+             {filteredCount > 0 && (
+               <div className="text-center text-sm text-gray-600 mb-4">
+                 {filteredCount.toLocaleString()} video{filteredCount !== 1 ? 's' : ''} excluded (shorter than {minVideoLength} min)
+               </div>
+             )}
             
             <div className="border-t pt-4">
               <h3 className="font-semibold text-gray-900 mb-3">Channel Averages (used for comparisons)</h3>
