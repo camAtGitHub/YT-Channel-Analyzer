@@ -20,7 +20,7 @@ const YouTubeAnalyzer = () => {
   const [filteredCount, setFilteredCount] = useState(0);
 
   const parseDuration = (duration) => {
-    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
     if (!match) return 0;
     const hours = parseInt(match[1] || '0');
     const minutes = parseInt(match[2] || '0');
@@ -29,7 +29,7 @@ const YouTubeAnalyzer = () => {
   };
 
   const formatDuration = (seconds) => {
-    if (seconds === 0) return 'N/A';
+    if (seconds === 0) return '0:00';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
