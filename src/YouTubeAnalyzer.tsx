@@ -241,6 +241,7 @@ const YouTubeAnalyzer = () => {
       const avgCpd = processedVideos.reduce((sum, v) => sum + v.cpd, 0) / processedVideos.length;
       const avgViews = processedVideos.reduce((sum, v) => sum + v.views, 0) / processedVideos.length;
       const avgEngagement = processedVideos.reduce((sum, v) => sum + v.engagementRate, 0) / processedVideos.length;
+      const stdEngagement = Math.sqrt(processedVideos.reduce((sum, v) => sum + Math.pow(v.engagementRate - avgEngagement, 2), 0) / processedVideos.length);
 
       setChannelAverages({
         avgCpd,
@@ -252,11 +253,16 @@ const YouTubeAnalyzer = () => {
         const cpdRatio = avgCpd > 0 ? video.cpd / avgCpd : 0;
         const viewsRatio = avgViews > 0 ? video.views / avgViews : 0;
         const engagementRatio = avgEngagement > 0 ? video.engagementRate / avgEngagement : 0;
-        
+
         const hiddenGemScore = engagementRatio - viewsRatio;
         const viralScore = viewsRatio * engagementRatio;
         const velocityScore = video.engagementRate / Math.log(video.daysAgo + 2);
-        
+
+        const logEngagement = video.engagementRate / Math.log(video.daysAgo + 2);
+        const powerCpd = video.cpd / Math.pow(video.daysAgo, 0.5);
+        const zEngagement = (video.engagementRate - avgEngagement) / stdEngagement;
+        const ageBalanced = (zEngagement + (video.views / Math.pow(video.daysAgo, 0.5))) / Math.log(video.daysAgo + 2);
+
         return {
           ...video,
           cpdRatio,
@@ -265,6 +271,10 @@ const YouTubeAnalyzer = () => {
           hiddenGemScore,
           viralScore,
           velocityScore,
+          logEngagement,
+          powerCpd,
+          zEngagement,
+          ageBalanced,
         };
       });
 
@@ -287,6 +297,10 @@ const YouTubeAnalyzer = () => {
       hidden: (v) => v.hiddenGemScore,
       viral: (v) => v.viralScore,
       velocity: (v) => v.velocityScore,
+      logEngagement: (v) => v.logEngagement,
+      powerCpd: (v) => v.powerCpd,
+      zEngagement: (v) => v.zEngagement,
+      ageBalanced: (v) => v.ageBalanced,
     };
     
     return metrics[sortBy](b) - metrics[sortBy](a);
@@ -658,6 +672,10 @@ const YouTubeAnalyzer = () => {
                     <option value="hidden">Hidden Gems</option>
                     <option value="viral">Viral Score</option>
                     <option value="velocity">Velocity Score</option>
+                    <option value="logEngagement">Log-Normalized Engagement</option>
+                    <option value="powerCpd">Power-Normalized CPD</option>
+                    <option value="zEngagement">Z-Score Engagement</option>
+                    <option value="ageBalanced">Age-Balanced Combo</option>
                   </select>
                   
                    <button
@@ -752,6 +770,26 @@ const YouTubeAnalyzer = () => {
                                 🔥 Viral
                               </span>
                             )}
+                            {video.logEngagement > channelAverages.avgEngagement / Math.log(30 + 2) && (
+                              <span className="px-2 py-1 bg-cyan-100 text-cyan-800 rounded text-xs font-semibold">
+                                🌟 Timeless Engagement
+                              </span>
+                            )}
+                            {video.powerCpd > 1 && (
+                              <span className="px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs font-semibold">
+                                ⚡ Balanced CPD
+                              </span>
+                            )}
+                            {video.zEngagement > 1 && (
+                              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
+                                ⚖️ Z-Score High
+                              </span>
+                            )}
+                            {video.ageBalanced > 0.5 && (
+                              <span className="px-2 py-1 bg-pink-100 text-pink-800 rounded text-xs font-semibold">
+                                🕰️ Age-Balanced
+                              </span>
+                            )}
                           </div>
 
                           <button
@@ -792,33 +830,58 @@ const YouTubeAnalyzer = () => {
                                 </div>
                               </div>
 
-                              <div>
-                                <h4 className="font-semibold text-gray-900 mb-2">Scores</h4>
-                                <div className="space-y-2 text-xs">
-                                  <div>
-                                    <div className="font-mono"><span className="text-gray-600">Hidden Gem Score =</span> {video.engagementRatio.toFixed(2)} (eng ratio) - {video.viewsRatio.toFixed(2)} (views ratio) = <span className="font-bold">{video.hiddenGemScore.toFixed(2)}</span></div>
-                                    {video.hiddenGemScore > 0.5 ? (
-                                      <div className="text-yellow-700 mt-1">✨ This video has {video.engagementRatio.toFixed(1)}x better engagement than average, but only {video.viewsRatio.toFixed(1)}x the views. It's underrated!</div>
-                                    ) : (
-                                      <div className="text-gray-600 mt-1">Score &lt; 0.5: Views match or exceed engagement level</div>
-                                    )}
-                                  </div>
-                                  
-                                  <div>
-                                    <div className="font-mono"><span className="text-gray-600">Viral Score =</span> {video.viewsRatio.toFixed(2)} (views ratio) × {video.engagementRatio.toFixed(2)} (eng ratio) = <span className="font-bold">{video.viralScore.toFixed(2)}</span></div>
-                                    {video.viralScore > 2 ? (
-                                      <div className="text-red-700 mt-1">🔥 This video has both high views AND high engagement - a true hit!</div>
-                                    ) : (
-                                      <div className="text-gray-600 mt-1">Score &lt; 2: Not exceptional in both dimensions</div>
-                                    )}
-                                  </div>
-                                  
-                                  <div>
-                                    <div className="font-mono"><span className="text-gray-600">Velocity Score =</span> {video.engagementRate.toFixed(6)} (eng rate) ÷ ln({video.daysAgo} + 2) = <span className="font-bold">{video.velocityScore.toFixed(6)}</span></div>
-                                    <div className="text-gray-600 mt-1">Adjusts engagement for age - newer videos get higher scores, rewarding fresh engagement</div>
-                                  </div>
-                                </div>
-                              </div>
+                               <div>
+                                 <h4 className="font-semibold text-gray-900 mb-2">Scores</h4>
+                                 <div className="space-y-2 text-xs">
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Hidden Gem Score =</span> {video.engagementRatio.toFixed(2)} (eng ratio) - {video.viewsRatio.toFixed(2)} (views ratio) = <span className="font-bold">{video.hiddenGemScore.toFixed(2)}</span></div>
+                                     {video.hiddenGemScore > 0.5 ? (
+                                       <div className="text-yellow-700 mt-1">✨ This video has {video.engagementRatio.toFixed(1)}x better engagement than average, but only {video.viewsRatio.toFixed(1)}x the views. It's underrated!</div>
+                                     ) : (
+                                       <div className="text-gray-600 mt-1">Score &lt; 0.5: Views match or exceed engagement level</div>
+                                     )}
+                                   </div>
+
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Viral Score =</span> {video.viewsRatio.toFixed(2)} (views ratio) × {video.engagementRatio.toFixed(2)} (eng ratio) = <span className="font-bold">{video.viralScore.toFixed(2)}</span></div>
+                                     {video.viralScore > 2 ? (
+                                       <div className="text-red-700 mt-1">🔥 This video has both high views AND high engagement - a true hit!</div>
+                                     ) : (
+                                       <div className="text-gray-600 mt-1">Score &lt; 2: Not exceptional in both dimensions</div>
+                                     )}
+                                   </div>
+
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Velocity Score =</span> {video.engagementRate.toFixed(6)} (eng rate) ÷ ln({video.daysAgo} + 2) = <span className="font-bold">{video.velocityScore.toFixed(6)}</span></div>
+                                     <div className="text-gray-600 mt-1">Adjusts engagement for age - newer videos get higher scores, rewarding fresh engagement</div>
+                                   </div>
+                                 </div>
+                               </div>
+
+                               <div>
+                                 <h4 className="font-semibold text-gray-900 mb-2">New Normalized Scores</h4>
+                                 <div className="space-y-2 text-xs">
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Log Engagement =</span> {video.engagementRate.toFixed(6)} ÷ ln({video.daysAgo} + 2) = <span className="font-bold">{video.logEngagement?.toFixed(6)}</span></div>
+                                     <div className="text-gray-600 mt-1">Log-normalized to balance age bias, favoring sustained older engagement.</div>
+                                   </div>
+
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Power CPD =</span> {video.cpd.toFixed(4)} ÷ ({video.daysAgo}^0.5) = <span className="font-bold">{video.powerCpd?.toFixed(4)}</span></div>
+                                     <div className="text-gray-600 mt-1">Square-root decay boosts comments on older videos.</div>
+                                   </div>
+
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Z-Score Engagement =</span> ({video.engagementRate.toFixed(6)} - {channelAverages.avgEngagement.toFixed(6)}) ÷ std = <span className="font-bold">{video.zEngagement?.toFixed(2)}</span></div>
+                                     <div className="text-gray-600 mt-1">Standardized engagement for fair comparison.</div>
+                                   </div>
+
+                                   <div>
+                                     <div className="font-mono"><span className="text-gray-600">Age-Balanced =</span> ({video.zEngagement?.toFixed(2)} + {video.views} / ({video.daysAgo}^0.5)) ÷ ln({video.daysAgo} + 2) = <span className="font-bold">{video.ageBalanced?.toFixed(4)}</span></div>
+                                     <div className="text-gray-600 mt-1">Hybrid score combining multiple normalizations.</div>
+                                   </div>
+                                 </div>
+                               </div>
                             </div>
                           )}
                         </div>
@@ -887,6 +950,34 @@ const YouTubeAnalyzer = () => {
                     <h4 className="font-semibold text-indigo-600 mb-2">Velocity Score</h4>
                     <p className="text-gray-700 mb-1"><strong>Formula:</strong> Engagement Rate ÷ ln(Days + 2)</p>
                     <p className="text-gray-600">Age-adjusted engagement. Uses logarithm to give newer videos a boost while not penalizing older videos too much. Shows which content maintains engagement over time.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-cyan-600 mb-2">🌟 Log-Normalized Engagement</h4>
+                    <p className="text-gray-700 mb-1"><strong>Formula:</strong> Engagement Rate ÷ ln(Days + 2)</p>
+                    <p className="text-gray-600 mb-2">Balances recency bias with logarithmic decay, favoring older videos with sustained engagement.</p>
+                    <p className="text-gray-700"><strong>Tagged when:</strong> Score &gt; channel average engagement / ln(30 + 2)</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-teal-600 mb-2">⚡ Power-Normalized CPD</h4>
+                    <p className="text-gray-700 mb-1"><strong>Formula:</strong> CPD ÷ (Days ^ 0.5)</p>
+                    <p className="text-gray-600 mb-2">Applies square-root decay to age, boosting comments on older videos proportionally.</p>
+                    <p className="text-gray-700"><strong>Tagged when:</strong> Score &gt; 1</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-purple-600 mb-2">⚖️ Z-Score Engagement</h4>
+                    <p className="text-gray-700 mb-1"><strong>Formula:</strong> (Engagement - Mean) / Std Dev</p>
+                    <p className="text-gray-600 mb-2">Standardizes engagement across videos, allowing comparison regardless of scale or age.</p>
+                    <p className="text-gray-700"><strong>Tagged when:</strong> Score &gt; 1 (above mean by 1 std dev)</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-pink-600 mb-2">🕰️ Age-Balanced Combo</h4>
+                    <p className="text-gray-700 mb-1"><strong>Formula:</strong> (Z-Score Eng + Power Views) ÷ ln(Days + 2)</p>
+                    <p className="text-gray-600 mb-2">Hybrid metric combining standardization and age adjustments for overall balance.</p>
+                    <p className="text-gray-700"><strong>Tagged when:</strong> Score &gt; 0.5</p>
                   </div>
 
                   <div className="bg-blue-50 p-3 rounded border border-blue-200">
