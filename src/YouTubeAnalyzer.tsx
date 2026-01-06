@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, MessageSquare, Eye, ThumbsUp, Download, RefreshCw, Sparkles, AlertCircle, ChevronDown, ChevronUp, Info, Clock } from 'lucide-react';
 
 const YouTubeAnalyzer = () => {
@@ -16,10 +16,64 @@ const YouTubeAnalyzer = () => {
   const [minVideoLength, setMinVideoLength] = useState(2);
   const [maxVideosToAnalyze, setMaxVideosToAnalyze] = useState(500);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [fetchedCount, setFetchedCount] = useState(0);
-  const [filteredCount, setFilteredCount] = useState(0);
+   const [fetchedCount, setFetchedCount] = useState(0);
+   const [filteredCount, setFilteredCount] = useState(0);
+   const [currentPage, setCurrentPage] = useState(0);
+   const videosPerPage = 50;
+   const [minimalVideos, setMinimalVideos] = useState([]);
+   const [sortedMinimal, setSortedMinimal] = useState([]);
+   const [enrichedPages, setEnrichedPages] = useState({});
 
-  const parseDuration = (duration) => {
+
+   const enrichVideos = (pageMinimal, avgCpd, avgViews, avgEngagement) => {
+     return pageMinimal.map(video => {
+       const cpdRatio = avgCpd > 0 ? video.cpd / avgCpd : 0;
+       const viewsRatio = avgViews > 0 ? video.views / avgViews : 0;
+       const engagementRatio = avgEngagement > 0 ? video.engagementRate / avgEngagement : 0;
+       const hiddenGemScore = engagementRatio - viewsRatio;
+       const viralScore = viewsRatio * engagementRatio;
+       const velocityScore = video.engagementRate / Math.log(video.daysAgo + 2);
+       return {
+         ...video,
+         cpdRatio,
+         viewsRatio,
+         engagementRatio,
+         hiddenGemScore,
+         viralScore,
+         velocityScore,
+       };
+     });
+   };
+
+   const metrics = {
+     cpd: (v) => v.cpd,
+     cpv: (v) => v.cpv,
+     lpv: (v) => v.lpv,
+     engagement: (v) => v.engagementRate,
+     views: (v) => v.views,
+     hidden: (v) => v.hiddenGemScore,
+     viral: (v) => v.viralScore,
+     velocity: (v) => v.velocityScore,
+     logEngagement: (v) => v.logEngagement,
+     powerCpd: (v) => v.powerCpd,
+     zEngagement: (v) => v.zEngagement,
+     ageBalanced: (v) => v.ageBalanced,
+   };
+
+   useEffect(() => {
+     if (minimalVideos.length > 0 && channelAverages) {
+       const newSorted = [...minimalVideos].sort((a, b) => metrics[sortBy](b) - metrics[sortBy](a));
+       setSortedMinimal(newSorted);
+       const start = currentPage * videosPerPage;
+       const end = start + videosPerPage;
+       const pageMinimal = newSorted.slice(start, end);
+       const pageEnriched = enrichVideos(pageMinimal, channelAverages.avgCpd, channelAverages.avgViews, channelAverages.avgEngagement, 0);
+       setEnrichedPages(prev => ({ ...prev, [currentPage]: pageEnriched }));
+       setVideos(pageEnriched);
+     }
+   }, [sortBy]);
+
+   const parseDuration = (duration) => {
     const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
     if (!match) return 0;
     const hours = parseInt(match[1] || '0');
@@ -235,51 +289,58 @@ const YouTubeAnalyzer = () => {
           cpv,
           lpv,
           engagementRate,
-        };
-      });
+         };
+       });
 
-      const avgCpd = processedVideos.reduce((sum, v) => sum + v.cpd, 0) / processedVideos.length;
-      const avgViews = processedVideos.reduce((sum, v) => sum + v.views, 0) / processedVideos.length;
-      const avgEngagement = processedVideos.reduce((sum, v) => sum + v.engagementRate, 0) / processedVideos.length;
-      const stdEngagement = Math.sqrt(processedVideos.reduce((sum, v) => sum + Math.pow(v.engagementRate - avgEngagement, 2), 0) / processedVideos.length);
+       const avgCpd = processedVideos.reduce((sum, v) => sum + v.cpd, 0) / processedVideos.length;
+       const avgViews = processedVideos.reduce((sum, v) => sum + v.views, 0) / processedVideos.length;
+       const avgEngagement = processedVideos.reduce((sum, v) => sum + v.engagementRate, 0) / processedVideos.length;
+       const stdEngagement = Math.sqrt(processedVideos.reduce((sum, v) => sum + Math.pow(v.engagementRate - avgEngagement, 2), 0) / processedVideos.length);
 
-      setChannelAverages({
-        avgCpd,
-        avgViews,
-        avgEngagement,
-      });
+       setChannelAverages({
+         avgCpd,
+         avgViews,
+         avgEngagement,
+       });
 
-      const enrichedVideos = processedVideos.map(video => {
-        const cpdRatio = avgCpd > 0 ? video.cpd / avgCpd : 0;
-        const viewsRatio = avgViews > 0 ? video.views / avgViews : 0;
-        const engagementRatio = avgEngagement > 0 ? video.engagementRate / avgEngagement : 0;
+       const minimalVideosData = processedVideos.map(video => {
+         const logEngagement = video.engagementRate / Math.log(video.daysAgo + 2);
+         const powerCpd = video.cpd / Math.pow(video.daysAgo, 0.5);
+         const zEngagement = (video.engagementRate - avgEngagement) / stdEngagement;
+         const ageBalanced = (zEngagement + (video.views / Math.pow(video.daysAgo, 0.5))) / Math.log(video.daysAgo + 2);
+         return {
+           id: video.id,
+           title: video.title,
+           publishedAt: video.publishedAt,
+           daysAgo: video.daysAgo,
+           views: video.views,
+           comments: video.comments,
+           likes: video.likes,
+           duration: video.duration,
+           formattedDuration: video.formattedDuration,
+           cpd: video.cpd,
+           cpv: video.cpv,
+           lpv: video.lpv,
+           engagementRate: video.engagementRate,
+           logEngagement,
+           powerCpd,
+           zEngagement,
+           ageBalanced,
+         };
+       });
 
-        const hiddenGemScore = engagementRatio - viewsRatio;
-        const viralScore = viewsRatio * engagementRatio;
-        const velocityScore = video.engagementRate / Math.log(video.daysAgo + 2);
+       setMinimalVideos(minimalVideosData);
 
-        const logEngagement = video.engagementRate / Math.log(video.daysAgo + 2);
-        const powerCpd = video.cpd / Math.pow(video.daysAgo, 0.5);
-        const zEngagement = (video.engagementRate - avgEngagement) / stdEngagement;
-        const ageBalanced = (zEngagement + (video.views / Math.pow(video.daysAgo, 0.5))) / Math.log(video.daysAgo + 2);
+       const sortedMinimalData = [...minimalVideosData].sort((a, b) => metrics[sortBy](b) - metrics[sortBy](a));
+       setSortedMinimal(sortedMinimalData);
 
-        return {
-          ...video,
-          cpdRatio,
-          viewsRatio,
-          engagementRatio,
-          hiddenGemScore,
-          viralScore,
-          velocityScore,
-          logEngagement,
-          powerCpd,
-          zEngagement,
-          ageBalanced,
-        };
-      });
+       const firstPageMinimal = sortedMinimalData.slice(0, videosPerPage);
+       const firstPageEnriched = enrichVideos(firstPageMinimal, avgCpd, avgViews, avgEngagement, stdEngagement);
+       setEnrichedPages({ 0: firstPageEnriched });
+       setVideos(firstPageEnriched);
+       setCurrentPage(0);
 
-      setVideos(enrichedVideos);
-      setProgress('');
+       setProgress('');
     } catch (err) {
       setError(err.message || 'An error occurred while fetching data');
     } finally {
@@ -288,21 +349,6 @@ const YouTubeAnalyzer = () => {
   };
 
   const sortedVideos = [...videos].sort((a, b) => {
-    const metrics = {
-      cpd: (v) => v.cpd,
-      cpv: (v) => v.cpv,
-      lpv: (v) => v.lpv,
-      engagement: (v) => v.engagementRate,
-      views: (v) => v.views,
-      hidden: (v) => v.hiddenGemScore,
-      viral: (v) => v.viralScore,
-      velocity: (v) => v.velocityScore,
-      logEngagement: (v) => v.logEngagement,
-      powerCpd: (v) => v.powerCpd,
-      zEngagement: (v) => v.zEngagement,
-      ageBalanced: (v) => v.ageBalanced,
-    };
-    
     return metrics[sortBy](b) - metrics[sortBy](a);
   });
 
@@ -702,7 +748,7 @@ const YouTubeAnalyzer = () => {
                     <div key={video.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                       <div className="flex items-start gap-4">
                         <div className="flex-shrink-0 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center font-bold">
-                          {idx + 1}
+                          {(currentPage * videosPerPage) + idx + 1}
                         </div>
                         
                         <div className="flex-1 min-w-0">
@@ -891,11 +937,64 @@ const YouTubeAnalyzer = () => {
                 </div>
               </div>
 
-              {sortedVideos.length > 50 && (
-                <div className="mt-4 text-center text-gray-600">
-                  Showing top 50 of {sortedVideos.length} videos
-                </div>
-              )}
+               <div className="mt-4 text-center text-gray-600">
+                 Showing ranks {(currentPage * videosPerPage) + 1}-{Math.min((currentPage + 1) * videosPerPage, sortedMinimal.length)} of {sortedMinimal.length} videos (Page {currentPage + 1})
+                 <div className="mt-2 flex justify-center gap-2">
+                   <button
+                     onClick={() => {
+                       if (currentPage > 0) {
+                         const newPage = currentPage - 1;
+                         let pageEnriched = enrichedPages[newPage];
+                         if (!pageEnriched) {
+                           const start = newPage * videosPerPage;
+                           const end = start + videosPerPage;
+                           const pageMinimal = sortedMinimal.slice(start, end);
+                           pageEnriched = enrichVideos(pageMinimal, channelAverages.avgCpd, channelAverages.avgViews, channelAverages.avgEngagement, 0);
+                           setEnrichedPages(prev => ({ ...prev, [newPage]: pageEnriched }));
+                         }
+                         setVideos(pageEnriched);
+                         setCurrentPage(newPage);
+                       }
+                     }}
+                     disabled={currentPage === 0}
+                     className="px-4 py-2 bg-gray-600 text-white rounded disabled:bg-gray-300"
+                   >
+                     Previous 50
+                   </button>
+                   <button
+                     onClick={() => {
+                       const newPage = currentPage + 1;
+                       if (newPage * videosPerPage < sortedMinimal.length) {
+                         if ((newPage) % 3 === 0) {
+                           alert("You've loaded several pages—continued browsing may increase memory usage. Continue at your own risk or reduce 'Max Videos to Analyze'.");
+                         }
+                         let pageEnriched = enrichedPages[newPage];
+                         if (!pageEnriched) {
+                           const start = newPage * videosPerPage;
+                           const end = start + videosPerPage;
+                           const pageMinimal = sortedMinimal.slice(start, end);
+                           pageEnriched = enrichVideos(pageMinimal, channelAverages.avgCpd, channelAverages.avgViews, channelAverages.avgEngagement, 0);
+                           setEnrichedPages(prev => {
+                             const newPages = { ...prev, [newPage]: pageEnriched };
+                             const keys = Object.keys(newPages).map(Number).sort((a,b) => b-a);
+                             if (keys.length > 3) {
+                               const toRemove = keys.slice(3);
+                               toRemove.forEach(k => delete newPages[k]);
+                             }
+                             return newPages;
+                           });
+                         }
+                         setVideos(pageEnriched);
+                         setCurrentPage(newPage);
+                       }
+                     }}
+                     disabled={(currentPage + 1) * videosPerPage >= sortedMinimal.length}
+                     className="px-4 py-2 bg-red-600 text-white rounded disabled:bg-gray-300"
+                   >
+                     Next 50
+                   </button>
+                 </div>
+               </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-xl p-6">
