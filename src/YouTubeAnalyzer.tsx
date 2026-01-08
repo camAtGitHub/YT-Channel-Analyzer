@@ -354,11 +354,12 @@ const YouTubeAnalyzer = () => {
 
   const exportData = () => {
     const data = {
-      videos,
+      minimalVideos,
       channelInfo,
       channelAverages,
       fetchedCount,
       filteredCount,
+      sortBy,
       timestamp: Date.now(),
     };
     const json = JSON.stringify(data, null, 2);
@@ -416,14 +417,25 @@ const YouTubeAnalyzer = () => {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        if (data.videos && data.channelInfo && data.channelAverages) {
-          setVideos(data.videos);
+        if (data.minimalVideos && data.channelInfo && data.channelAverages) {
+          setMinimalVideos(data.minimalVideos);
           setChannelInfo(data.channelInfo);
           setChannelAverages(data.channelAverages);
           setFetchedCount(data.fetchedCount || 0);
           setFilteredCount(data.filteredCount || 0);
+          setSortBy(data.sortBy || 'cpd');
           setHasApiKey(true);
           setError('');
+
+          // Re-compute sorted and enriched data
+          const sorted = [...data.minimalVideos].sort((a, b) => metrics[data.sortBy || 'cpd'](b) - metrics[data.sortBy || 'cpd'](a));
+          setSortedMinimal(sorted);
+
+          const firstPageMinimal = sorted.slice(0, videosPerPage);
+          const firstPageEnriched = enrichVideos(firstPageMinimal, data.channelAverages.avgCpd, data.channelAverages.avgViews, data.channelAverages.avgEngagement);
+          setEnrichedPages({ 0: firstPageEnriched });
+          setVideos(firstPageEnriched);
+          setCurrentPage(0);
         } else {
           setError('Invalid data file. Please check the file format.');
         }
@@ -662,10 +674,10 @@ const YouTubeAnalyzer = () => {
                  <div className="text-2xl font-bold text-red-600">{channelInfo.totalVideos.toLocaleString()}</div>
                  <div className="text-sm text-gray-600">Total Videos</div>
                </div>
-               <div className="text-center">
-                 <div className="text-2xl font-bold text-red-600">{videos.length.toLocaleString()}</div>
-                 <div className="text-sm text-gray-600">Analyzed</div>
-               </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{sortedMinimal.length.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">Analyzed</div>
+                </div>
                <div className="text-center">
                  <div className="text-lg font-bold text-gray-700">{fetchedCount.toLocaleString()}</div>
                  <div className="text-sm text-gray-600">Fetched</div>
