@@ -1,3 +1,6 @@
+// YT Channel Analyzer
+// File: src/YouTubeAnalyzer.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
