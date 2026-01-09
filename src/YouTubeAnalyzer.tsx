@@ -42,6 +42,20 @@ const YouTubeAnalyzer = () => {
   const [enrichedPages, setEnrichedPages] = useState({});
   const [maxAge, setMaxAge] = useState(0);
   const [outlierFilter, setOutlierFilter] = useState('none');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedApiKey = localStorage.getItem('yt-analyzer-api-key');
+      if (savedApiKey) {
+        setApiKey(savedApiKey);
+        setHasApiKey(true);
+      }
+    } catch (err) {
+      console.error('Failed to load API key from localStorage:', err);
+    }
+  }, []);
 
   // Debug function for browser console
   useEffect(() => {
@@ -651,6 +665,27 @@ const YouTubeAnalyzer = () => {
     reader.readAsText(file);
   };
 
+  const clearApiKey = () => {
+    try {
+      localStorage.removeItem('yt-analyzer-api-key');
+    } catch (err) {
+      console.error('Failed to clear API key from localStorage:', err);
+    }
+    setApiKey('');
+    setHasApiKey(false);
+    setShowApiKeyModal(false);
+    reset();
+  };
+
+  const getMaskedApiKey = () => {
+    if (apiKey.length <= 4) return apiKey;
+    const first2 = apiKey.substring(0, 2);
+    const last2 = apiKey.substring(apiKey.length - 2);
+    const maskedLength = Math.max(0, apiKey.length - 4);
+    const masked = '*'.repeat(Math.min(maskedLength, 20));
+    return `${first2}${masked}${last2}`;
+  };
+
   const toggleVideoDetails = (videoId) => {
     setExpandedVideo(expandedVideo === videoId ? null : videoId);
   };
@@ -726,6 +761,11 @@ const YouTubeAnalyzer = () => {
             <button
               onClick={() => {
                 if (apiKey) {
+                  try {
+                    localStorage.setItem('yt-analyzer-api-key', apiKey);
+                  } catch (err) {
+                    console.error('Failed to save API key to localStorage:', err);
+                  }
                   setHasApiKey(true);
                 } else {
                   setError('Please enter an API key');
@@ -745,10 +785,9 @@ const YouTubeAnalyzer = () => {
             <div className="mt-6 text-xs text-gray-500">
               <p className="font-semibold mb-1">Privacy Note:</p>
               <p>
-                Your API key is stored only in your browser's memory for this
-                session and is never sent to any server except Google's YouTube
-                API. Your browser may offer to save the key to your password
-                manager.
+                Your API key is stored in your browser's local storage and persists across sessions.
+                It is never sent to any server except Google's YouTube API. The key remains on your
+                device and can be cleared at any time using the "Change API Key" button.
                </p>
              </div>
            </div>
@@ -770,7 +809,7 @@ const YouTubeAnalyzer = () => {
             </div>
 
             <button
-              onClick={() => setHasApiKey(false)}
+              onClick={() => setShowApiKeyModal(true)}
               className="text-sm text-gray-600 hover:text-gray-900"
             >
               Change API Key
@@ -790,6 +829,19 @@ const YouTubeAnalyzer = () => {
                 placeholder="e.g., https://youtube.com/@channelname or UC..."
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Or Load Saved Analysis
+              </label>
+
+              <input
+                type="file"
+                accept=".json"
+                onChange={loadData}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
             </div>
 
@@ -1775,6 +1827,49 @@ const YouTubeAnalyzer = () => {
           </>
         )}
       </div>
+
+      {/* API Key Management Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              API Key Management
+            </h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current API Key (Masked)
+              </label>
+              <div className="px-4 py-3 bg-gray-100 rounded-lg font-mono text-sm text-gray-700 break-all">
+                {getMaskedApiKey()}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={clearApiKey}
+                className="w-full bg-red-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-red-700 transition"
+              >
+                Clear API Key & Return to Login
+              </button>
+
+              <button
+                onClick={() => setShowApiKeyModal(false)}
+                className="w-full bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500">
+              <p>
+                Clearing your API key will remove it from browser storage and return you to the login screen.
+                Any unsaved analysis data will be lost.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
