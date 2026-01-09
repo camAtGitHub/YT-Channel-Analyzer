@@ -810,7 +810,7 @@ const YouTubeAnalyzer = () => {
                 <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Minimum Video Length
+                      Minimum Video Length (0 = no restriction)
                     </label>
 
                     <select
@@ -820,6 +820,7 @@ const YouTubeAnalyzer = () => {
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     >
+                      <option value={0}>0 minutes (no restriction)</option>
                       <option value={2}>2 minutes</option>
                       <option value={5}>5 minutes</option>
                       <option value={7}>7 minutes</option>
@@ -833,7 +834,7 @@ const YouTubeAnalyzer = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Max Videos to Analyze (1-9999)
+                      Max Videos to Analyze (1-100,000)
                     </label>
 
                     <input
@@ -841,12 +842,12 @@ const YouTubeAnalyzer = () => {
                       value={maxVideosToAnalyze}
                       onChange={(e) => {
                         const value = parseInt(e.target.value);
-                        if (value >= 1 && value <= 9999) {
+                        if (value >= 1 && value <= 100000) {
                           setMaxVideosToAnalyze(value);
                         }
                       }}
                       min={1}
-                      max={9999}
+                      max={100000}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
@@ -933,7 +934,7 @@ const YouTubeAnalyzer = () => {
               </div>
             </div>
 
-            {filteredCount > 0 && (
+            {filteredCount > 0 && minVideoLength > 0 && (
               <div className="text-center text-sm text-gray-600 mb-4">
                 {filteredCount.toLocaleString()} video
                 {filteredCount !== 1 ? 's' : ''} excluded (shorter than{' '}
@@ -971,7 +972,7 @@ const YouTubeAnalyzer = () => {
           </div>
         )}
 
-        {videos.length > 0 && (
+        {minimalVideos.length > 0 && (
           <>
             <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
@@ -1047,7 +1048,10 @@ const YouTubeAnalyzer = () => {
                           No Matching Videos Found
                         </p>
                         <p className="text-yellow-700 text-lg">
-                          No videos match the "{outlierFilter}" filter criteria.
+                          No videos match the {outlierFilter === 'viralOutliers' ? '"Viral Outliers"' : 
+                            outlierFilter === 'engagementOutliers' ? '"Engagement Outliers"' :
+                            outlierFilter === 'commentOutliers' ? '"Comment Outliers"' :
+                            outlierFilter === 'underperformers' ? '"Underperformers"' : '"' + outlierFilter + '"'} filter criteria.
                         </p>
                         <p className="text-yellow-600 text-sm mt-2">
                           This channel doesn't have videos that meet this criteria.
@@ -1693,6 +1697,77 @@ const YouTubeAnalyzer = () => {
                       ratio of 2.0 means the video is 2x better than average for
                       that metric.
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  Outlier Filter Explanations
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-red-600 mb-2">
+                        🔥 Viral Outliers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with 5x+ the channel average views
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Videos that exceeded typical channel virality
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Find breakthrough moments in channel history
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-purple-600 mb-2">
+                        ⚡ Engagement Outliers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with engagement rate 3+ standard deviations above channel average (Z-Score &gt; 3)
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Exceptionally engaging videos relative to channel norm
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Study what drives abnormally high audience interaction
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-blue-600 mb-2">
+                        💬 Comment Outliers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with 10x+ the channel average Comments Per Day (CPD ratio &gt; 10)
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Videos that sparked disproportionate discussion
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Find controversial, discussion-driving, or highly debated content
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-orange-600 mb-2">
+                        📉 Underperformers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with engagement rate 2+ standard deviations below channel average (Z-Score &lt; -2)
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Videos that underperformed audience engagement expectations
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Identify what content doesn't resonate with audience; avoid patterns
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
