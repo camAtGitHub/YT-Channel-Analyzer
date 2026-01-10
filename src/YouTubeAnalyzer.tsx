@@ -43,6 +43,7 @@ const YouTubeAnalyzer = () => {
   const [maxAge, setMaxAge] = useState(0);
   const [outlierFilter, setOutlierFilter] = useState('none');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiCallCount, setApiCallCount] = useState(0);
 
   // Load API key from localStorage on mount
   useEffect(() => {
@@ -157,6 +158,10 @@ const YouTubeAnalyzer = () => {
     qualityPercentile: (v) => v.qualityPercentile,
     powerCpd: (v) => v.powerCpd,
     zEngagement: (v) => v.zEngagement,
+    viralOutliers: (v) => v.viewsRatio,
+    engagementOutliers: (v) => v.zEngagement,
+    commentOutliers: (v) => v.cpdRatio,
+    underperformers: (v) => -v.zEngagement,
   };
 
 
@@ -172,32 +177,16 @@ const YouTubeAnalyzer = () => {
       );
 
       let filteredVideos = enrichedForSort;
-      if (outlierFilter !== 'none') {
-  
-
-
-
-        filteredVideos = enrichedForSort.filter((video) => {
-          let matches;
-          switch (outlierFilter) {
-            case 'viralOutliers':
-              matches = video.viewsRatio > 5;
-              break;
-            case 'engagementOutliers':
-              matches = video.zEngagement > 3;
-              break;
-            case 'commentOutliers':
-              matches = video.cpdRatio > 10;
-              break;
-            case 'underperformers':
-              matches = video.zEngagement < -2;
-              break;
-            default:
-              matches = true;
-          }
-          return matches;
-        });
-
+      
+      // Apply filtering for outlier sorts
+      if (sortBy === 'viralOutliers') {
+        filteredVideos = enrichedForSort.filter((video) => video.viewsRatio > 5);
+      } else if (sortBy === 'engagementOutliers') {
+        filteredVideos = enrichedForSort.filter((video) => video.zEngagement > 3);
+      } else if (sortBy === 'commentOutliers') {
+        filteredVideos = enrichedForSort.filter((video) => video.cpdRatio > 10);
+      } else if (sortBy === 'underperformers') {
+        filteredVideos = enrichedForSort.filter((video) => video.zEngagement < -2);
       }
 
       const newSorted = filteredVideos.length === 0 ? [] : [...filteredVideos].sort((a, b) => {
@@ -230,7 +219,7 @@ const YouTubeAnalyzer = () => {
       setEnrichedPages((prev) => ({ ...prev, [currentPage]: pageEnriched }));
       setVideos(pageEnriched);
     }
-  }, [sortBy, outlierFilter, minimalVideos, channelAverages, currentPage, maxAge]);
+  }, [sortBy, minimalVideos, channelAverages, currentPage, maxAge]);
 
   const parseDuration = (duration) => {
     const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
@@ -319,6 +308,7 @@ const YouTubeAnalyzer = () => {
     setError('');
     setVideos([]);
     setProgress('Starting analysis...');
+    setApiCallCount(0);
 
     try {
       const extractedId = extractChannelId(channelInput);
@@ -373,6 +363,7 @@ const YouTubeAnalyzer = () => {
       while (pageCount < maxPages && allVideoIds.length < maxVideosToAnalyze) {
         const playlistUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploadsPlaylistId}&maxResults=50&key=${apiKey}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`;
 
+        setApiCallCount((prev) => prev + 1);
         const playlistResponse = await fetch(playlistUrl);
         const playlistData = await playlistResponse.json();
 
@@ -940,6 +931,11 @@ const YouTubeAnalyzer = () => {
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 {progress}
+                {progress.includes('Fetching video list') && apiCallCount > 0 && (
+                  <span className="ml-2 font-semibold text-blue-600">
+                    (API calls: {apiCallCount})
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -1049,25 +1045,17 @@ const YouTubeAnalyzer = () => {
                     </option>
                     <option value="powerCpd">Power CPD</option>
                     <option value="zEngagement">Z-Score Engagement</option>
-                  </select>
-
-                  <select
-                    value={outlierFilter}
-                    onChange={(e) => setOutlierFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                  >
-                    <option value="none">All Videos</option>
                     <option value="viralOutliers">
-                      Viral Outliers (5x+ views)
+                      🔥 Viral Outliers (5x+ views)
                     </option>
                     <option value="engagementOutliers">
-                      Engagement Outliers (3σ+)
+                      ⚡ Engagement Outliers (3σ+)
                     </option>
                     <option value="commentOutliers">
-                      Comment Outliers (10x+ CPD)
+                      💬 Comment Outliers (10x+ CPD)
                     </option>
                     <option value="underperformers">
-                      Underperformers (2σ-)
+                      📉 Underperformers (2σ-)
                     </option>
                   </select>
 
@@ -1091,8 +1079,13 @@ const YouTubeAnalyzer = () => {
 
                <div className="overflow-x-auto">
                 {(() => {
-                  // Show empty state if no videos AND we're using a filter
-                  if (videos.length === 0 && outlierFilter !== 'none') {
+                  // Show empty state if no videos AND we're using an outlier filter
+                  const isOutlierSort = ['viralOutliers', 'engagementOutliers', 'commentOutliers', 'underperformers'].includes(sortBy);
+                  if (videos.length === 0 && isOutlierSort) {
+                    const filterName = sortBy === 'viralOutliers' ? 'Viral Outliers' : 
+                      sortBy === 'engagementOutliers' ? 'Engagement Outliers' :
+                      sortBy === 'commentOutliers' ? 'Comment Outliers' :
+                      sortBy === 'underperformers' ? 'Underperformers' : sortBy;
                     return (
                       <div className="text-center py-12 bg-yellow-50 border-4 border-yellow-400 rounded-lg m-4">
                         <div className="text-6xl mb-4">⚠️</div>
@@ -1100,16 +1093,13 @@ const YouTubeAnalyzer = () => {
                           No Matching Videos Found
                         </p>
                         <p className="text-yellow-700 text-lg">
-                          No videos match the {outlierFilter === 'viralOutliers' ? '"Viral Outliers"' : 
-                            outlierFilter === 'engagementOutliers' ? '"Engagement Outliers"' :
-                            outlierFilter === 'commentOutliers' ? '"Comment Outliers"' :
-                            outlierFilter === 'underperformers' ? '"Underperformers"' : '"' + outlierFilter + '"'} filter criteria.
+                          No videos match the "{filterName}" filter criteria.
                         </p>
                         <p className="text-yellow-600 text-sm mt-2">
                           This channel doesn't have videos that meet this criteria.
                         </p>
                         <p className="text-yellow-600 text-sm mt-1">
-                          Try selecting "All Videos" or a different filter.
+                          Try selecting a different sort/filter option.
                         </p>
                       </div>
                     );
@@ -1237,6 +1227,30 @@ const YouTubeAnalyzer = () => {
                             {video.zEngagement > 2 && (
                               <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
                                 ⚖️ Z-Score High
+                              </span>
+                            )}
+
+                            {video.viewsRatio > 5 && (
+                              <span className="px-2 py-1 bg-rose-100 text-rose-800 rounded text-xs font-semibold">
+                                🔥 Viral Outlier
+                              </span>
+                            )}
+
+                            {video.zEngagement > 3 && (
+                              <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs font-semibold">
+                                ⚡ Engagement Outlier
+                              </span>
+                            )}
+
+                            {video.cpdRatio > 10 && (
+                              <span className="px-2 py-1 bg-sky-100 text-sky-800 rounded text-xs font-semibold">
+                                💬 Comment Outlier
+                              </span>
+                            )}
+
+                            {video.zEngagement < -2 && (
+                              <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs font-semibold">
+                                📉 Underperformer
                               </span>
                             )}
                           </div>
