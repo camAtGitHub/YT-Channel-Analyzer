@@ -1,2 +1,4 @@
 node_modules/
 dist/
+
+# YT-Channel-Analyzer_compiled.html is intentionally tracked for standalone distribution
