@@ -1,7 +1,8 @@
 {
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run postbuild",
+    "postbuild": "cp dist/index.html YT-Channel-Analyzer_compiled.html",
     "preview": "vite preview"
   },
   "name": "yt-analyser",
@@ -22,6 +23,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "typescript": "^5.9.3",
-    "vite": "^7.3.0"
+    "vite": "^7.3.0",
+    "vite-plugin-singlefile": "^2.3.0"
   }
 }
