@@ -42,6 +42,20 @@ const YouTubeAnalyzer = () => {
   const [enrichedPages, setEnrichedPages] = useState({});
   const [maxAge, setMaxAge] = useState(0);
   const [outlierFilter, setOutlierFilter] = useState('none');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedApiKey = localStorage.getItem('yt-analyzer-api-key');
+      if (savedApiKey) {
+        setApiKey(savedApiKey);
+        setHasApiKey(true);
+      }
+    } catch (err) {
+      console.error('Failed to load API key from localStorage:', err);
+    }
+  }, []);
 
   // Debug function for browser console
   useEffect(() => {
@@ -651,6 +665,27 @@ const YouTubeAnalyzer = () => {
     reader.readAsText(file);
   };
 
+  const clearApiKey = () => {
+    try {
+      localStorage.removeItem('yt-analyzer-api-key');
+    } catch (err) {
+      console.error('Failed to clear API key from localStorage:', err);
+    }
+    setApiKey('');
+    setHasApiKey(false);
+    setShowApiKeyModal(false);
+    reset();
+  };
+
+  const getMaskedApiKey = () => {
+    if (apiKey.length <= 4) return apiKey;
+    const first2 = apiKey.substring(0, 2);
+    const last2 = apiKey.substring(apiKey.length - 2);
+    const maskedLength = Math.max(0, apiKey.length - 4);
+    const masked = '*'.repeat(Math.min(maskedLength, 20));
+    return `${first2}${masked}${last2}`;
+  };
+
   const toggleVideoDetails = (videoId) => {
     setExpandedVideo(expandedVideo === videoId ? null : videoId);
   };
@@ -726,6 +761,11 @@ const YouTubeAnalyzer = () => {
             <button
               onClick={() => {
                 if (apiKey) {
+                  try {
+                    localStorage.setItem('yt-analyzer-api-key', apiKey);
+                  } catch (err) {
+                    console.error('Failed to save API key to localStorage:', err);
+                  }
                   setHasApiKey(true);
                 } else {
                   setError('Please enter an API key');
@@ -745,10 +785,9 @@ const YouTubeAnalyzer = () => {
             <div className="mt-6 text-xs text-gray-500">
               <p className="font-semibold mb-1">Privacy Note:</p>
               <p>
-                Your API key is stored only in your browser's memory for this
-                session and is never sent to any server except Google's YouTube
-                API. Your browser may offer to save the key to your password
-                manager.
+                Your API key is stored in your browser's local storage and persists across sessions.
+                It is never sent to any server except Google's YouTube API. The key remains on your
+                device and can be cleared at any time using the "Change API Key" button.
                </p>
              </div>
            </div>
@@ -770,7 +809,7 @@ const YouTubeAnalyzer = () => {
             </div>
 
             <button
-              onClick={() => setHasApiKey(false)}
+              onClick={() => setShowApiKeyModal(true)}
               className="text-sm text-gray-600 hover:text-gray-900"
             >
               Change API Key
@@ -793,6 +832,19 @@ const YouTubeAnalyzer = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Or Load Saved Analysis
+              </label>
+
+              <input
+                type="file"
+                accept=".json"
+                onChange={loadData}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              />
+            </div>
+
             <div className="mb-4">
               <button
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
@@ -810,7 +862,7 @@ const YouTubeAnalyzer = () => {
                 <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Minimum Video Length
+                      Minimum Video Length (0 = no restriction)
                     </label>
 
                     <select
@@ -820,6 +872,7 @@ const YouTubeAnalyzer = () => {
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     >
+                      <option value={0}>0 minutes (no restriction)</option>
                       <option value={2}>2 minutes</option>
                       <option value={5}>5 minutes</option>
                       <option value={7}>7 minutes</option>
@@ -833,7 +886,7 @@ const YouTubeAnalyzer = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Max Videos to Analyze (1-9999)
+                      Max Videos to Analyze (1-100,000)
                     </label>
 
                     <input
@@ -841,12 +894,12 @@ const YouTubeAnalyzer = () => {
                       value={maxVideosToAnalyze}
                       onChange={(e) => {
                         const value = parseInt(e.target.value);
-                        if (value >= 1 && value <= 9999) {
+                        if (value >= 1 && value <= 100000) {
                           setMaxVideosToAnalyze(value);
                         }
                       }}
                       min={1}
-                      max={9999}
+                      max={100000}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
@@ -933,7 +986,7 @@ const YouTubeAnalyzer = () => {
               </div>
             </div>
 
-            {filteredCount > 0 && (
+            {filteredCount > 0 && minVideoLength > 0 && (
               <div className="text-center text-sm text-gray-600 mb-4">
                 {filteredCount.toLocaleString()} video
                 {filteredCount !== 1 ? 's' : ''} excluded (shorter than{' '}
@@ -971,7 +1024,7 @@ const YouTubeAnalyzer = () => {
           </div>
         )}
 
-        {videos.length > 0 && (
+        {minimalVideos.length > 0 && (
           <>
             <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
@@ -1047,7 +1100,10 @@ const YouTubeAnalyzer = () => {
                           No Matching Videos Found
                         </p>
                         <p className="text-yellow-700 text-lg">
-                          No videos match the "{outlierFilter}" filter criteria.
+                          No videos match the {outlierFilter === 'viralOutliers' ? '"Viral Outliers"' : 
+                            outlierFilter === 'engagementOutliers' ? '"Engagement Outliers"' :
+                            outlierFilter === 'commentOutliers' ? '"Comment Outliers"' :
+                            outlierFilter === 'underperformers' ? '"Underperformers"' : '"' + outlierFilter + '"'} filter criteria.
                         </p>
                         <p className="text-yellow-600 text-sm mt-2">
                           This channel doesn't have videos that meet this criteria.
@@ -1696,10 +1752,124 @@ const YouTubeAnalyzer = () => {
                   </div>
                 </div>
               </div>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  Outlier Filter Explanations
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-red-600 mb-2">
+                        🔥 Viral Outliers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with 5x+ the channel average views
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Videos that exceeded typical channel virality
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Find breakthrough moments in channel history
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-purple-600 mb-2">
+                        ⚡ Engagement Outliers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with engagement rate 3+ standard deviations above channel average (Z-Score &gt; 3)
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Exceptionally engaging videos relative to channel norm
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Study what drives abnormally high audience interaction
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-blue-600 mb-2">
+                        💬 Comment Outliers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with 10x+ the channel average Comments Per Day (CPD ratio &gt; 10)
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Videos that sparked disproportionate discussion
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Find controversial, discussion-driving, or highly debated content
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-orange-600 mb-2">
+                        📉 Underperformers
+                      </h4>
+                      <p className="text-gray-700 mb-1">
+                        <strong>Criteria:</strong> Videos with engagement rate 2+ standard deviations below channel average (Z-Score &lt; -2)
+                      </p>
+                      <p className="text-gray-600 mb-1">
+                        <strong>What it identifies:</strong> Videos that underperformed audience engagement expectations
+                      </p>
+                      <p className="text-gray-600">
+                        <strong>Use case:</strong> Identify what content doesn't resonate with audience; avoid patterns
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
       </div>
+
+      {/* API Key Management Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              API Key Management
+            </h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current API Key (Masked)
+              </label>
+              <div className="px-4 py-3 bg-gray-100 rounded-lg font-mono text-sm text-gray-700 break-all">
+                {getMaskedApiKey()}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={clearApiKey}
+                className="w-full bg-red-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-red-700 transition"
+              >
+                Clear API Key & Return to Login
+              </button>
+
+              <button
+                onClick={() => setShowApiKeyModal(false)}
+                className="w-full bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500">
+              <p>
+                Clearing your API key will remove it from browser storage and return you to the login screen.
+                Any unsaved analysis data will be lost.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
